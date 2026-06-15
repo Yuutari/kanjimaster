@@ -17,9 +17,7 @@ class ProgressScreen extends StatelessWidget {
     final studiedRatio = total == 0 ? 0.0 : studied / total;
     final masteredRatio = total == 0 ? 0.0 : mastered / total;
 
-    final n5List = allKanji.where((k) => k.jlptLevel == 'N5').toList();
-    final n5Studied = n5List.where((k) => k.studied).length;
-    final n5Mastered = n5List.where((k) => k.mastered).length;
+    final jlptLevels = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F5FF),
@@ -82,19 +80,22 @@ class ProgressScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _jlptRow(
-                    level: 'N5',
-                    studied: n5Studied,
-                    total: n5List.length,
-                    mastered: n5Mastered,
-                  ),
-                  const SizedBox(height: 16),
-                  _jlptRow(
-                    level: 'N4',
-                    studied: 0,
-                    total: 0,
-                    mastered: 0,
-                  ),
+                  for (var i = 0; i < jlptLevels.length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: i == jlptLevels.length - 1 ? 0 : 16),
+                      child: _jlptRow(
+                        level: jlptLevels[i],
+                        studied: allKanji
+                            .where((k) => k.jlptLevel == jlptLevels[i] && k.studied)
+                            .length,
+                        total: allKanji
+                            .where((k) => k.jlptLevel == jlptLevels[i])
+                            .length,
+                        mastered: allKanji
+                            .where((k) => k.jlptLevel == jlptLevels[i] && k.mastered)
+                            .length,
+                      ),
+                    ),
                 ],
               ),
             ),

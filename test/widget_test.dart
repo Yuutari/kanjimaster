@@ -9,22 +9,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kanjimaster/main.dart';
+import 'package:kanjimaster/ui/screens/quiz_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('app launches and shows the loading state', (tester) async {
     await tester.pumpWidget(const KanjiApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('quiz results summary renders completion stats', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QuizResultsView(
+          correct: 15,
+          total: 20,
+          missed: 5,
+          onRestart: () {},
+          onExit: () {},
+        ),
+      ),
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Quiz complete'), findsOneWidget);
+    expect(find.text('15 of 20 correct'), findsOneWidget);
+    expect(find.text('5 missed kanji ready to review'), findsOneWidget);
   });
 }
