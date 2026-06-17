@@ -16,6 +16,7 @@ void main() async {
     databaseFactory = databaseFactoryFfiWeb;
   }
   runApp(const KanjiApp());
+  }
 class KanjiApp extends StatefulWidget {
   const KanjiApp({super.key});
 
