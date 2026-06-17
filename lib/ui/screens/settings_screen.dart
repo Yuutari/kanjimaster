@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Экран настроек приложения.
-/// Хранит выбранную тему и предпочтения в SharedPreferences.
 class SettingsScreen extends StatefulWidget {
   final ValueChanged<ThemeMode>? onThemeChanged;
   final ThemeMode currentTheme;
@@ -19,6 +17,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool _darkMode;
+  late bool _aiEnabled;
   late bool _soundEnabled;
   late bool _notificationsEnabled;
   late bool _romajiEnabled;
@@ -26,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late int _dailyGoal;
 
   static const _kDark = 'settings_dark_mode';
+  static const _kAi = 'aiEnabled';
   static const _kSound = 'settings_sound';
   static const _kNotif = 'settings_notifications';
   static const _kRomaji = 'settings_romaji';
@@ -36,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _darkMode = widget.currentTheme == ThemeMode.dark;
+    _aiEnabled = true;
     _soundEnabled = true;
     _notificationsEnabled = true;
     _romajiEnabled = false;
@@ -44,10 +45,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadPrefs();
   }
 
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentTheme != widget.currentTheme) {
+      setState(() => _darkMode = widget.currentTheme == ThemeMode.dark);
+    }
+  }
+
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _darkMode = p.getBool(_kDark) ?? (widget.currentTheme == ThemeMode.dark);
+      _aiEnabled = p.getBool(_kAi) ?? true;
       _soundEnabled = p.getBool(_kSound) ?? true;
       _notificationsEnabled = p.getBool(_kNotif) ?? true;
       _romajiEnabled = p.getBool(_kRomaji) ?? false;
@@ -59,6 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _savePrefs() async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(_kDark, _darkMode);
+    await p.setBool(_kAi, _aiEnabled);
     await p.setBool(_kSound, _soundEnabled);
     await p.setBool(_kNotif, _notificationsEnabled);
     await p.setBool(_kRomaji, _romajiEnabled);
@@ -70,7 +82,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -78,38 +89,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  'Settings',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
+              const Text(
+                'Settings',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 24),
-
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SwitchListTile.adaptive(
-                    value: _darkMode,
-                    onChanged: (value) {
-                      setState(() => _darkMode = value);
-                      _savePrefs();
-                      widget.onThemeChanged?.call(value ? ThemeMode.dark : ThemeMode.light);
-                    },
-                    title: const Text('Enable AI suggestions'),
-                    subtitle: const Text('Use AI tips in the quiz flow.'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Внешний вид
+              // Appearance
               _sectionTitle('Appearance'),
               _card([
                 _switchTile(
@@ -118,17 +103,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Switch to dark theme',
                   value: _darkMode,
                   onChanged: (v) {
-                    final nextMode = v ? ThemeMode.dark : ThemeMode.light;
                     setState(() => _darkMode = v);
                     _savePrefs();
-                    widget.onThemeChanged?.call(nextMode);
+                    widget.onThemeChanged?.call(
+                      v ? ThemeMode.dark : ThemeMode.light,
+                    );
                   },
                 ),
               ]),
-
               const SizedBox(height: 16),
-
-              // Обучение
+              // AI
+              _sectionTitle('AI Coach'),
+              _card([
+                _switchTile(
+                  icon: Icons.auto_awesome,
+                  title: 'Enable AI Suggestions',
+                  subtitle: 'Use AI tips in the quiz flow',
+                  value: _aiEnabled,
+                  onChanged: (v) {
+                    setState(() => _aiEnabled = v);
+                    _savePrefs();
+                  },
+                ),
+              ]),
+              const SizedBox(height: 16),
+              // Learning
               _sectionTitle('Learning'),
               _card([
                 _switchTile(
@@ -171,10 +170,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ]),
-
               const SizedBox(height: 16),
-
-              // Уведомления
+              // Notifications
               _sectionTitle('Notifications'),
               _card([
                 _switchTile(
@@ -199,29 +196,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ]),
-
               const SizedBox(height: 16),
-
-              // О приложении
+              // About
               _sectionTitle('About'),
               _card([
                 ListTile(
-                  leading: Icon(Icons.info_outline,
-                      color: scheme.primary),
+                  leading: Icon(Icons.info_outline, color: scheme.primary),
                   title: const Text('Version'),
                   trailing: const Text('1.0.0',
                       style: TextStyle(color: Colors.grey)),
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.code,
-                      color: scheme.primary),
+                  leading: Icon(Icons.code, color: scheme.primary),
                   title: const Text('KanjiMaster'),
-                  subtitle: const Text(
-                      'Flutter · Dart · SQLite'),
+                  subtitle: const Text('Flutter · Dart · SQLite'),
                 ),
               ]),
-
               const SizedBox(height: 24),
             ],
           ),
@@ -261,11 +252,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required ValueChanged<bool> onChanged,
   }) {
     return SwitchListTile(
-      secondary: Icon(icon,
-          color: Theme.of(context).colorScheme.primary),
+      secondary: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(title),
-      subtitle: Text(subtitle,
-          style: const TextStyle(fontSize: 12)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       value: value,
       activeColor: Theme.of(context).colorScheme.primary,
       onChanged: onChanged,
@@ -280,17 +269,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required ValueChanged<String?> onChanged,
   }) {
     return ListTile(
-      leading: Icon(icon,
-          color: Theme.of(context).colorScheme.primary),
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(title),
       trailing: DropdownButton<String>(
         value: value,
         underline: const SizedBox(),
         items: items.entries
-            .map((e) => DropdownMenuItem(
-                  value: e.key,
-                  child: Text(e.value),
-                ))
+            .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
             .toList(),
         onChanged: onChanged,
       ),
@@ -308,30 +293,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required ValueChanged<int> onChanged,
   }) {
     return ListTile(
-      leading:
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(title),
-      subtitle: Text(subtitle,
-          style: const TextStyle(fontSize: 12)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             icon: const Icon(Icons.remove_circle_outline),
-            onPressed: value > min
-                ? () => onChanged(value - step)
-                : null,
+            onPressed: value > min ? () => onChanged(value - step) : null,
           ),
-          Text(
-            '$value',
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w600),
-          ),
+          Text('$value',
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600)),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: value < max
-                ? () => onChanged(value + step)
-                : null,
+            onPressed: value < max ? () => onChanged(value + step) : null,
           ),
         ],
       ),
