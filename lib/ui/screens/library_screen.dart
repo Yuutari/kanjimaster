@@ -117,6 +117,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   return KanjiCard(
                     kanji: filtered[index],
                     repository: widget.repository,
+                                    onChanged: () => setState(() {}),
                   );
                 },
               ),
