@@ -1,8 +1,6 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../data/kanji_repository.dart';
 import '../../models/kanji.dart';
 
@@ -10,7 +8,6 @@ enum QuizType { meaning, reading }
 
 class QuizScreen extends StatefulWidget {
   final KanjiRepository repository;
-
   const QuizScreen({super.key, required this.repository});
 
   @override
@@ -21,7 +18,6 @@ class _QuizScreenState extends State<QuizScreen> {
   static const _aiEnabledKey = 'aiEnabled';
   static const _difficultyKey = 'aiDifficulty';
   static const _focusModeKey = 'focusMode';
-
   static const int _quizQuestionLimit = 20;
 
   QuizType? _selectedType;
@@ -60,73 +56,56 @@ class _QuizScreenState extends State<QuizScreen> {
 
   List<Kanji> _filteredKanji() {
     final allKanji = widget.repository.kanji;
-    if (_selectedJlptLevel == 'All') {
-      return allKanji;
-    }
-
-    return allKanji
-        .where((kanji) => kanji.jlptLevel == _selectedJlptLevel)
-        .toList();
+    if (_selectedJlptLevel == 'All') return allKanji;
+    return allKanji.where((k) => k.jlptLevel == _selectedJlptLevel).toList();
   }
 
   List<Kanji> _buildQuestionQueue() {
     final pool = _filteredKanji();
     if (pool.isEmpty) return [];
-
     final shuffled = List<Kanji>.from(pool)..shuffle(Random());
     return shuffled.take(_quizQuestionLimit).toList();
   }
 
   String _answerLabel(Kanji kanji) {
-    if (_selectedType == QuizType.meaning) {
-      return kanji.meaning;
-    }
+    if (_selectedType == QuizType.meaning) return kanji.meaning;
     return kanji.onYomi.isNotEmpty ? kanji.onYomi.first : kanji.kunYomi.first;
   }
 
   List<String> _optionsForCurrent() {
     final current = _questionQueue[_currentIndex];
-    final pool = _filteredKanji().where((kanji) => kanji.char != current.char).toList();
+    final pool = _filteredKanji().where((k) => k.char != current.char).toList();
     final correct = _answerLabel(current);
-
     final List<String> wrongOptions = [];
     final randomPool = List<Kanji>.from(pool)..shuffle(Random());
 
     for (final candidate in randomPool) {
-      final candidateLabel = _answerLabel(candidate);
-      if (candidateLabel.trim().isEmpty || candidateLabel == correct) {
-        continue;
-      }
-      if (!wrongOptions.contains(candidateLabel)) {
-        wrongOptions.add(candidateLabel);
-      }
+      final label = _answerLabel(candidate);
+      if (label.trim().isEmpty || label == correct || wrongOptions.contains(label)) continue;
+      wrongOptions.add(label);
       if (wrongOptions.length == 3) break;
     }
 
     if (wrongOptions.length < 3) {
       final fallback = widget.repository.kanji
-          .where((kanji) => kanji.char != current.char)
-          .toList()
-        ..shuffle(Random());
+          .where((k) => k.char != current.char)
+          .toList()..shuffle(Random());
       for (final candidate in fallback) {
-        final candidateLabel = _answerLabel(candidate);
-        if (candidateLabel.trim().isEmpty || candidateLabel == correct || wrongOptions.contains(candidateLabel)) {
-          continue;
-        }
-        wrongOptions.add(candidateLabel);
+        final label = _answerLabel(candidate);
+        if (label.trim().isEmpty || label == correct || wrongOptions.contains(label)) continue;
+        wrongOptions.add(label);
         if (wrongOptions.length == 3) break;
       }
     }
 
-    final options = <String>[correct, ...wrongOptions]..shuffle(Random());
-    return options;
+    return [correct, ...wrongOptions]..shuffle(Random());
   }
 
   void _startQuiz(QuizType type) {
     final filtered = _filteredKanji();
     if (filtered.length < 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Choose a broader JLPT level or add more kanji to the deck.')),
+        const SnackBar(content: Text('Choose a broader JLPT level or add more kanji.')),
       );
       return;
     }
@@ -155,31 +134,27 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
-  void _chooseOption(int index) async {
+  Future<void> _chooseOption(int index) async {
     if (_answered) return;
     final current = _questionQueue[_currentIndex];
-
     setState(() {
       _answered = true;
       _selectedOption = index;
     });
 
-    final correctValue = _selectedType == QuizType.meaning
-        ? current.meaning
-        : (current.onYomi.isNotEmpty
-            ? current.onYomi.first
-            : current.kunYomi.first);
-
+    final correctValue = _answerLabel(current);
     final isCorrect = _options[index] == correctValue;
 
     if (isCorrect) {
       setState(() => _correct++);
       await widget.repository.markStudied(current);
-    } else if (!_reviewQueue.any((kanji) => kanji.char == current.char)) {
-      setState(() {
-        _reviewQueue.add(current);
-      });
+    } else if (!_reviewQueue.any((k) => k.char == current.char)) {
+      setState(() => _reviewQueue.add(current));
     }
+
+    // Auto-advance after 1.2 seconds
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (mounted) _nextQuestion();
   }
 
   void _resetQuiz() {
@@ -204,7 +179,6 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_currentIndex == _baseQuestionCount - 1 && _reviewQueue.isNotEmpty) {
       _summaryCorrect = _correct;
       _summaryMissed = _reviewQueue.length;
-
       final reviewCards = _reviewQueue.toSet().toList()..shuffle(Random());
       setState(() {
         _questionQueue = [..._questionQueue, ...reviewCards];
@@ -223,13 +197,11 @@ class _QuizScreenState extends State<QuizScreen> {
       final summaryMissed = _summaryMissed > 0
           ? _summaryMissed
           : (summaryTotal - summaryCorrect).clamp(0, summaryTotal);
-
       setState(() {
         _showResults = true;
         _questionQueue = [];
         _reviewQueue = [];
       });
-
       return;
     }
 
@@ -243,6 +215,13 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF7F5FF);
+    final cardColor = isDark ? const Color(0xFF252540) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subColor = isDark ? Colors.white54 : Colors.black54;
+
     final allKanji = widget.repository.kanji;
 
     if (_showResults) {
@@ -251,124 +230,108 @@ class _QuizScreenState extends State<QuizScreen> {
       final summaryMissed = _summaryMissed > 0
           ? _summaryMissed
           : (summaryTotal - summaryCorrect).clamp(0, summaryTotal);
-
       return QuizResultsView(
         correct: summaryCorrect,
         total: summaryTotal,
         missed: summaryMissed,
         onRestart: () => _startQuiz(_selectedType ?? QuizType.meaning),
         onExit: _resetQuiz,
+        isDark: isDark,
       );
     }
 
     if (_selectedType == null) {
       final studied = allKanji.where((k) => k.studied).length;
       return Scaffold(
-        backgroundColor: const Color(0xFFF7F5FF),
-        body: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 8),
-              const Text(
-                'Ready to Quiz?',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'You have studied $studied kanji',
-                style: const TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEAE5FF),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.auto_awesome, color: Color(0xFF7A69E8)),
-                        SizedBox(width: 8),
-                        Text('AI SRS Quiz', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text('20 random cards, JLPT filtering, and missed kanji returned at the end.'),
-                    const SizedBox(height: 4),
-                    Text('Selected JLPT: $_selectedJlptLevel', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedJlptLevel,
-                decoration: const InputDecoration(
-                  labelText: 'JLPT level',
-                  border: OutlineInputBorder(),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'All', child: Text('All')),
-                  DropdownMenuItem(value: 'N5', child: Text('N5')),
-                  DropdownMenuItem(value: 'N4', child: Text('N4')),
-                  DropdownMenuItem(value: 'N3', child: Text('N3')),
-                  DropdownMenuItem(value: 'N2', child: Text('N2')),
-                  DropdownMenuItem(value: 'N1', child: Text('N1')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedJlptLevel = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              if (_aiEnabled)
+        backgroundColor: bgColor,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 8),
+                Text('Ready to Quiz?',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: textColor)),
+                const SizedBox(height: 4),
+                Text('You have studied $studied kanji', style: TextStyle(color: subColor)),
+                const SizedBox(height: 20),
                 Container(
                   margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAE5FF),
+                    color: isDark ? const Color(0xFF2E2E50) : const Color(0xFFEAE5FF),
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.auto_awesome, color: Color(0xFF7A69E8)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'AI Coach: $_difficulty mode with $_focusMode focus. We recommend starting with the weakest kanji.',
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF3B3658)),
-                        ),
+                      Row(
+                        children: [
+                          Icon(Icons.auto_awesome,
+                              color: isDark ? const Color(0xFFB8A9FF) : const Color(0xFF7A69E8)),
+                          const SizedBox(width: 8),
+                          Text('AI SRS Quiz',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w700, color: textColor)),
+                        ],
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                          '20 random cards, JLPT filtering, and missed kanji returned at the end.',
+                          style: TextStyle(fontSize: 13, color: subColor)),
+                      const SizedBox(height: 6),
+                      Text('Selected JLPT: $_selectedJlptLevel',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: textColor)),
                     ],
                   ),
                 ),
-              _quizTypeCard(
-                title: 'Meaning Quiz',
-                subtitle: 'Match kanji to their meanings',
-                icon: Icons.g_translate,
-                onTap: () => _startQuiz(QuizType.meaning),
-              ),
-              const SizedBox(height: 12),
-              _quizTypeCard(
-                title: 'Reading Quiz',
-                subtitle: 'Match kanji to their readings',
-                icon: Icons.record_voice_over_outlined,
-                onTap: () => _startQuiz(QuizType.reading),
-              ),
-            ],
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedJlptLevel,
+                  decoration: InputDecoration(
+                    labelText: 'JLPT level',
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: cardColor,
+                  ),
+                  dropdownColor: cardColor,
+                  items: const [
+                    DropdownMenuItem(value: 'All', child: Text('All')),
+                    DropdownMenuItem(value: 'N5', child: Text('N5')),
+                    DropdownMenuItem(value: 'N4', child: Text('N4')),
+                    DropdownMenuItem(value: 'N3', child: Text('N3')),
+                    DropdownMenuItem(value: 'N2', child: Text('N2')),
+                    DropdownMenuItem(value: 'N1', child: Text('N1')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _selectedJlptLevel = value);
+                  },
+                ),
+                const SizedBox(height: 20),
+                _quizTypeCard(
+                  title: 'Meaning Quiz',
+                  subtitle: 'Match kanji to their meanings',
+                  icon: Icons.g_translate,
+                  onTap: () => _startQuiz(QuizType.meaning),
+                  cardColor: cardColor,
+                  textColor: textColor,
+                  subColor: subColor,
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 12),
+                _quizTypeCard(
+                  title: 'Reading Quiz',
+                  subtitle: 'Match kanji to their readings',
+                  icon: Icons.record_voice_over_outlined,
+                  onTap: () => _startQuiz(QuizType.reading),
+                  cardColor: cardColor,
+                  textColor: textColor,
+                  subColor: subColor,
+                  isDark: isDark,
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -379,142 +342,155 @@ class _QuizScreenState extends State<QuizScreen> {
     final questionTitle = _selectedType == QuizType.meaning
         ? 'What does this mean?'
         : 'What is a reading of this kanji?';
+    final correctValue = _answerLabel(current);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F5FF),
-      body: Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _currentIndex >= _baseQuestionCount
-                  ? 'Review missed kanji ${_currentIndex + 1} of $total'
-                  : 'Question ${_currentIndex + 1} of $total',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _currentIndex >= _baseQuestionCount
+                    ? 'Review missed kanji ${_currentIndex + 1} of $total'
+                    : 'Question ${_currentIndex + 1} of $total',
+                style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text('$_correct correct',
-                style: const TextStyle(color: Colors.black54)),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: total == 0 ? 0 : (_currentIndex + 1) / total,
-              backgroundColor: const Color(0xFFE4E4EF),
-              valueColor: const AlwaysStoppedAnimation(
-                Color(0xFF27273F),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    questionTitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    current.char,
-                    style: const TextStyle(
-                      fontSize: 72,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...List.generate(_options.length, (i) {
-              final opt = _options[i];
-              Color bg = Colors.white;
-              Color border = Colors.transparent;
-
-              if (_answered) {
-                final correctValue = _selectedType ==
-                        QuizType.meaning
-                    ? current.meaning
-                    : (current.onYomi.isNotEmpty
-                        ? current.onYomi.first
-                        : current.kunYomi.first);
-
-                if (opt == correctValue) {
-                  bg = const Color(0xFFE5F8ED);
-                  border = const Color(0xFF2E8B57);
-                } else if (i == _selectedOption) {
-                  bg = const Color(0xFFFFE5E5);
-                  border = const Color(0xFFE57373);
-                }
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => _chooseOption(i),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: border),
-                      ),
-                      child: Text(
-                        opt,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
+              const SizedBox(height: 4),
+              Text('$_correct correct', style: TextStyle(color: subColor)),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? 0 : (_currentIndex + 1) / total,
+                    minHeight: 6,
+                    backgroundColor: isDark
+                        ? const Color(0xFF3A3A50)
+                        : const Color(0xFFE4E4EF),
+                    valueColor: AlwaysStoppedAnimation(
+                        isDark ? const Color(0xFFB8A9FF) : const Color(0xFF7A69E8)),
                   ),
                 ),
-              );
-            }),
-            const Spacer(),
-            SafeArea(
-              minimum: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _resetQuiz,
-                      child: const Text('Exit'),
-                    ),
+              ),
+              const SizedBox(height: 24),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: Container(
+                  key: ValueKey(_currentIndex),
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _nextQuestion,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF27273F),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
+                  child: Column(
+                    children: [
+                      Text(questionTitle,
+                          style: TextStyle(fontSize: 14, color: subColor)),
+                      const SizedBox(height: 20),
+                      Text(
+                        current.char,
+                        style: TextStyle(
+                            fontSize: 80, fontWeight: FontWeight.w700, color: textColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ...List.generate(_options.length, (i) {
+                final opt = _options[i];
+                Color bg = cardColor;
+                Color border = Colors.transparent;
+                IconData? icon;
+
+                if (_answered) {
+                  if (opt == correctValue) {
+                    bg = isDark
+                        ? const Color(0xFF1E4D2B)
+                        : const Color(0xFFE5F8ED);
+                    border = const Color(0xFF2E8B57);
+                    icon = Icons.check_circle;
+                  } else if (i == _selectedOption) {
+                    bg = isDark
+                        ? const Color(0xFF4D1E1E)
+                        : const Color(0xFFFFE5E5);
+                    border = const Color(0xFFE57373);
+                    icon = Icons.cancel;
+                  }
+                }
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Material(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(16),
+                    elevation: 0,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _chooseOption(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: border,
+                              width: border == Colors.transparent ? 1 : 2),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                opt,
+                                style: TextStyle(fontSize: 16, color: textColor),
+                              ),
+                            ),
+                            if (icon != null)
+                              Icon(icon, color: border, size: 24),
+                          ],
                         ),
                       ),
-                      child: Text(
-                        _currentIndex == total - 1 ? 'Finish' : 'Next',
-                      ),
                     ),
                   ),
-                ],
+                );
+              }),
+              const Spacer(),
+              Text(
+                _answered
+                    ? 'Auto-advancing...'
+                    : 'Select an answer',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: subColor),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _resetQuiz,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  side: BorderSide(color: subColor),
+                ),
+                child: Text('Exit Quiz', style: TextStyle(color: textColor)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -525,10 +501,15 @@ class _QuizScreenState extends State<QuizScreen> {
     required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
+    required Color cardColor,
+    required Color textColor,
+    required Color subColor,
+    required bool isDark,
   }) {
     return Material(
-      color: Colors.white,
+      color: cardColor,
       borderRadius: BorderRadius.circular(20),
+      elevation: 0,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
@@ -539,34 +520,32 @@ class _QuizScreenState extends State<QuizScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F1FF),
+                  color: isDark
+                      ? const Color(0xFF3A3A50)
+                      : const Color(0xFFF3F1FF),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: const Color(0xFF9C8CFF)),
+                child: Icon(icon,
+                    color: isDark
+                        ? const Color(0xFFB8A9FF)
+                        : const Color(0xFF9C8CFF)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(title,
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: textColor)),
                     const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                      ),
-                    ),
+                    Text(subtitle, style: TextStyle(color: subColor)),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              Icon(Icons.chevron_right, color: subColor),
             ],
           ),
         ),
@@ -581,6 +560,7 @@ class QuizResultsView extends StatelessWidget {
   final int missed;
   final VoidCallback onRestart;
   final VoidCallback onExit;
+  final bool isDark;
 
   const QuizResultsView({
     super.key,
@@ -589,49 +569,76 @@ class QuizResultsView extends StatelessWidget {
     required this.missed,
     required this.onRestart,
     required this.onExit,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF7F5FF);
+    final cardColor = isDark ? const Color(0xFF252540) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subColor = isDark ? Colors.white70 : const Color(0xFF3B3658);
+    final score = (correct / total * 100).round();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F5FF),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(24),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
-                    color: Color(0x1A27273F),
-                    blurRadius: 18,
-                    offset: Offset(0, 8),
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Quiz complete',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  Icon(
+                    score >= 80
+                        ? Icons.emoji_events
+                        : score >= 50
+                            ? Icons.thumb_up
+                            : Icons.restart_alt,
+                    size: 64,
+                    color: score >= 80
+                        ? const Color(0xFFFFB300)
+                        : isDark
+                            ? Colors.white54
+                            : Colors.black54,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    score >= 80
+                        ? 'Excellent!'
+                        : score >= 50
+                            ? 'Good job!'
+                            : 'Keep practicing!',
+                    style: TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.w700, color: textColor),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$correct of $total correct',
-                    style: const TextStyle(fontSize: 16, color: Color(0xFF3B3658)),
+                    '$correct of $total correct ($score%)',
+                    style: TextStyle(fontSize: 16, color: subColor),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '$missed missed kanji ready to review',
-                    style: const TextStyle(fontSize: 16, color: Color(0xFF3B3658)),
-                  ),
-                  const SizedBox(height: 24),
+                  if (missed > 0) ..[
+                    const SizedBox(height: 6),
+                    Text(
+                      '$missed missed kanji reviewed',
+                      style: TextStyle(fontSize: 14, color: subColor),
+                    ),
+                  ],
+                  const SizedBox(height: 28),
                   Row(
                     children: [
                       Expanded(
@@ -640,10 +647,10 @@ class QuizResultsView extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                                borderRadius: BorderRadius.circular(16)),
+                            side: BorderSide(color: subColor),
                           ),
-                          child: const Text('Exit'),
+                          child: Text('Exit', style: TextStyle(color: textColor)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -651,14 +658,15 @@ class QuizResultsView extends StatelessWidget {
                         child: ElevatedButton(
                           onPressed: onRestart,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF27273F),
+                            backgroundColor: isDark
+                                ? const Color(0xFF7A69E8)
+                                : const Color(0xFF27273F),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                                borderRadius: BorderRadius.circular(16)),
                           ),
-                          child: const Text('Try again'),
+                          child: const Text('Try Again'),
                         ),
                       ),
                     ],
