@@ -1,58 +1,87 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/kanji.dart';
+import 'database_provider.dart';
 
 class KanjiRepository {
-  static const _studiedKey = 'studiedKanjiChars';
-  static const _masteredKey = 'masteredKanjiChars';
+  final _db = DatabaseProvider.instance;
 
   List<Kanji> _kanji = [];
 
   List<Kanji> get kanji => _kanji;
 
   Future<void> load() async {
-    final jsonStr = await rootBundle.loadString('assets/kanji_all.json');
-    final List<dynamic> data = json.decode(jsonStr) as List<dynamic>;
-    _kanji = data
-        .map((e) => Kanji.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final db = await _db.database;
 
-    final prefs = await SharedPreferences.getInstance();
-    final studiedChars = prefs.getStringList(_studiedKey) ?? [];
-    final masteredChars = prefs.getStringList(_masteredKey) ?? [];
+    // If DB is empty, seed from assets JSON
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM kanji'),
+    ) ?? 0;
 
-    for (final k in _kanji) {
-      if (studiedChars.contains(k.char)) {
-        k.studied = true;
-      }
-      if (masteredChars.contains(k.char)) {
-        k.mastered = true;
-      }
+    if (count == 0) {
+      await _seedFromJson(db);
     }
+
+    final rows = await db.query('kanji', orderBy: 'jlpt_level ASC');
+    _kanji = rows.map((row) => Kanji(
+      char: row['symbol'] as String,
+      meaning: row['meaning'] as String? ?? '',
+      onyomi: row['onyomi'] as String? ?? '',
+      kunyomi: row['kunyomi'] as String? ?? '',
+      jlptLevel: row['jlpt_level'] as int? ?? 5,
+      strokes: row['strokes'] as int? ?? 0,
+      studied: (row['studied'] as int? ?? 0) == 1,
+      mastered: (row['mastered'] as int? ?? 0) == 1,
+    )).toList();
   }
 
-  Future<void> _saveProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    final studiedChars =
-        _kanji.where((k) => k.studied).map((k) => k.char).toList();
-    final masteredChars =
-        _kanji.where((k) => k.mastered).map((k) => k.char).toList();
-
-    await prefs.setStringList(_studiedKey, studiedChars);
-    await prefs.setStringList(_masteredKey, masteredChars);
+  Future<void> _seedFromJson(dynamic db) async {
+    try {
+      final jsonStr = await rootBundle.loadString('assets/kanji_all.json');
+      final List<dynamic> data = json.decode(jsonStr) as List<dynamic>;
+      final batch = db.batch();
+      for (final e in data) {
+        final map = e as Map<String, dynamic>;
+        batch.insert('kanji', {
+          'symbol': map['char'] ?? map['symbol'] ?? '',
+          'onyomi': map['onyomi'] ?? '',
+          'kunyomi': map['kunyomi'] ?? '',
+          'meaning': map['meaning'] ?? '',
+          'jlpt_level': map['jlptLevel'] ?? map['jlpt_level'] ?? 5,
+          'strokes': map['strokes'] ?? 0,
+          'radical': map['radical'] ?? '',
+          'studied': 0,
+          'mastered': 0,
+        });
+      }
+      await batch.commit(noResult: true);
+    } catch (_) {
+      // JSON not found or parse error, skip seeding
+    }
   }
 
   Future<void> markStudied(Kanji k) async {
     if (!k.studied) {
       k.studied = true;
-      await _saveProgress();
+      final db = await _db.database;
+      await db.update(
+        'kanji',
+        {'studied': 1},
+        where: 'symbol = ?',
+        whereArgs: [k.char],
+      );
     }
   }
 
   Future<void> toggleMastered(Kanji k) async {
     k.mastered = !k.mastered;
     if (k.mastered) k.studied = true;
-    await _saveProgress();
+    final db = await _db.database;
+    await db.update(
+      'kanji',
+      {'mastered': k.mastered ? 1 : 0, 'studied': k.studied ? 1 : 0},
+      where: 'symbol = ?',
+      whereArgs: [k.char],
+    );
   }
 }
