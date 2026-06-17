@@ -6,10 +6,16 @@ import 'ui/screens/quiz_screen.dart';
 import 'ui/screens/progress_screen.dart';
 import 'ui/screens/settings_screen.dart';
 
-void main() {
-  runApp(const KanjiApp());
-}
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'package:sqflite/sqflite.dart';
 
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  }
+  runApp(const KanjiApp());
 class KanjiApp extends StatefulWidget {
   const KanjiApp({super.key});
 

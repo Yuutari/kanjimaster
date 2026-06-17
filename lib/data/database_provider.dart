@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 const String dbName = 'kanjimaster.db';
 
@@ -18,10 +17,6 @@ class DatabaseProvider {
   }
 
   Future<Database> _initDb() async {
-    if (kIsWeb) {
-      databaseFactory = databaseFactoryFfiWeb;
-    }
-
     final dbPath = kIsWeb ? '' : await getDatabasesPath();
     final path = kIsWeb ? dbName : p.join(dbPath, dbName);
 
