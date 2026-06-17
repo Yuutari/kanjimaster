@@ -3,7 +3,7 @@ import '../../models/kanji.dart';
 import '../../data/kanji_repository.dart';
 import '../screens/kanji_details_screen.dart';
 
-class KanjiCard extends StatelessWidget {
+class KanjiCard extends StatefulWidget {
   final Kanji kanji;
   final KanjiRepository repository;
 
@@ -14,17 +14,25 @@ class KanjiCard extends StatelessWidget {
   });
 
   @override
+  State<KanjiCard> createState() => _KanjiCardState();
+}
+
+class _KanjiCardState extends State<KanjiCard> {
+  @override
   Widget build(BuildContext context) {
+    final kanji = widget.kanji;
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => KanjiDetailsScreen(
               kanji: kanji,
-              repository: repository,
+              repository: widget.repository,
             ),
           ),
-        );
+        ).then((_) {
+          if (mounted) setState(() {});
+        });
       },
       child: Container(
         decoration: BoxDecoration(
@@ -45,21 +53,31 @@ class KanjiCard extends StatelessWidget {
             Text(
               kanji.meaning,
               style: const TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5F8ED),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                kanji.jlptLevel,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF2E8B57),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5F8ED),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    kanji.jlptLevel,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF2E8B57),
+                    ),
+                  ),
                 ),
-              ),
+                if (kanji.mastered)
+                  const Icon(Icons.star, size: 14, color: Color(0xFFFFD700))
+                else if (kanji.studied)
+                  const Icon(Icons.check_circle, size: 14, color: Colors.green),
+              ],
             ),
           ],
         ),
