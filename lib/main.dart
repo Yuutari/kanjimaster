@@ -35,8 +35,13 @@ class _KanjiAppState extends State<KanjiApp> {
   }
 
   Future<void> _init() async {
-    await _repo.load();
-    setState(() => _loaded = true);
+        try {
+      await _repo.load();
+    } catch (e) {
+      debugPrint('Init error: $e');
+    } finally {
+      setState(() => _loaded = true);
+    }
   }
 
   @override
