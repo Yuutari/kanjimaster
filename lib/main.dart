@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'data/kanji_repository.dart';
 import 'ui/screens/library_screen.dart';
 import 'ui/screens/profile_screen.dart';
@@ -22,7 +20,6 @@ class KanjiApp extends StatefulWidget {
 class _KanjiAppState extends State<KanjiApp> {
   final KanjiRepository _repo = KanjiRepository();
   bool _loaded = false;
-  ThemeMode _themeMode = ThemeMode.light;
 
   @override
   void initState() {
@@ -32,18 +29,7 @@ class _KanjiAppState extends State<KanjiApp> {
 
   Future<void> _init() async {
     await _repo.load();
-    final prefs = await SharedPreferences.getInstance();
-    final dark = prefs.getBool('settings_dark_mode') ?? false;
-
-    if (!mounted) return;
-    setState(() {
-      _themeMode = dark ? ThemeMode.dark : ThemeMode.light;
-      _loaded = true;
-    });
-  }
-
-  void _onThemeChanged(ThemeMode mode) {
-    setState(() => _themeMode = mode);
+    setState(() => _loaded = true);
   }
 
   @override
@@ -51,31 +37,15 @@ class _KanjiAppState extends State<KanjiApp> {
     return MaterialApp(
       title: 'Kanji Master',
       debugShowCheckedModeBanner: false,
-      themeMode: _themeMode,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF9C8CFF),
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF7F5FF),
-        cardColor: Colors.white,
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF9C8CFF),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xFF1A1A2E),
-        cardColor: const Color(0xFF16213E),
         useMaterial3: true,
       ),
       home: _loaded
-          ? RootScreen(
-              repository: _repo,
-              themeMode: _themeMode,
-              onThemeChanged: _onThemeChanged,
-            )
+          ? RootScreen(repository: _repo)
           : const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
@@ -85,15 +55,8 @@ class _KanjiAppState extends State<KanjiApp> {
 
 class RootScreen extends StatefulWidget {
   final KanjiRepository repository;
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeChanged;
 
-  const RootScreen({
-    super.key,
-    required this.repository,
-    required this.themeMode,
-    required this.onThemeChanged,
-  });
+  const RootScreen({super.key, required this.repository});
 
   @override
   State<RootScreen> createState() => _RootScreenState();
@@ -109,10 +72,7 @@ class _RootScreenState extends State<RootScreen> {
       QuizScreen(repository: widget.repository),
       ProgressScreen(repository: widget.repository),
       ProfileScreen(repository: widget.repository),
-      SettingsScreen(
-        currentTheme: widget.themeMode,
-        onThemeChanged: widget.onThemeChanged,
-      ),
+      const SettingsScreen(),
     ];
 
     return Scaffold(

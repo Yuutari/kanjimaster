@@ -223,6 +223,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Register a new profile',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Profile name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _targetLevel,
+                        decoration: const InputDecoration(
+                          labelText: 'Target JLPT level',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: ['N5', 'N4', 'N3', 'N2', 'N1']
+                            .map((level) => DropdownMenuItem(value: level, child: Text(level)))
+                            .toList(),
+                        onChanged: (value) => setState(() => _targetLevel = value ?? _targetLevel),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {},
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('Create profile'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF27273F),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -288,7 +339,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 k.studied = false;
                 k.mastered = false;
               }
-              await widget.repository.save();
               setState(() {});
             },
             child: const Text(

@@ -4,13 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Экран настроек приложения.
 /// Хранит выбранную тему и предпочтения в SharedPreferences.
 class SettingsScreen extends StatefulWidget {
-  final ValueChanged<ThemeMode> onThemeChanged;
+  final ValueChanged<ThemeMode>? onThemeChanged;
   final ThemeMode currentTheme;
 
   const SettingsScreen({
     super.key,
-    required this.onThemeChanged,
-    required this.currentTheme,
+    this.onThemeChanged,
+    this.currentTheme = ThemeMode.light,
   });
 
   @override
@@ -90,6 +90,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SwitchListTile.adaptive(
+                    value: _darkMode,
+                    onChanged: (value) {
+                      setState(() => _darkMode = value);
+                      _savePrefs();
+                      widget.onThemeChanged?.call(value ? ThemeMode.dark : ThemeMode.light);
+                    },
+                    title: const Text('Enable AI suggestions'),
+                    subtitle: const Text('Use AI tips in the quiz flow.'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Внешний вид
               _sectionTitle('Appearance'),
               _card([
@@ -99,10 +118,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Switch to dark theme',
                   value: _darkMode,
                   onChanged: (v) {
+                    final nextMode = v ? ThemeMode.dark : ThemeMode.light;
                     setState(() => _darkMode = v);
                     _savePrefs();
-                    widget.onThemeChanged(
-                        v ? ThemeMode.dark : ThemeMode.light);
+                    widget.onThemeChanged?.call(nextMode);
                   },
                 ),
               ]),
@@ -227,11 +246,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _card(List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
+    return Material(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(20),
       child: Column(children: children),
     );
   }

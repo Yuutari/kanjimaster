@@ -38,6 +38,8 @@ class _QuizScreenState extends State<QuizScreen> {
   List<Kanji> _reviewQueue = [];
   int _baseQuestionCount = 0;
   bool _showResults = false;
+  int _summaryCorrect = 0;
+  int _summaryMissed = 0;
 
   @override
   void initState() {
@@ -139,6 +141,9 @@ class _QuizScreenState extends State<QuizScreen> {
 
     setState(() {
       _selectedType = type;
+      _showResults = false;
+      _summaryCorrect = 0;
+      _summaryMissed = 0;
       _questionQueue = questionQueue;
       _reviewQueue = [];
       _baseQuestionCount = questionQueue.length;
@@ -147,7 +152,6 @@ class _QuizScreenState extends State<QuizScreen> {
       _answered = false;
       _selectedOption = null;
       _options = _optionsForCurrent();
-      _showResults = false;
     });
   }
 
@@ -178,10 +182,29 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
+  void _resetQuiz() {
+    setState(() {
+      _showResults = false;
+      _selectedType = null;
+      _questionQueue = [];
+      _reviewQueue = [];
+      _currentIndex = 0;
+      _correct = 0;
+      _answered = false;
+      _selectedOption = null;
+      _options = [];
+      _summaryCorrect = 0;
+      _summaryMissed = 0;
+    });
+  }
+
   void _nextQuestion() {
     final total = _questionQueue.length;
 
     if (_currentIndex == _baseQuestionCount - 1 && _reviewQueue.isNotEmpty) {
+      _summaryCorrect = _correct;
+      _summaryMissed = _reviewQueue.length;
+
       final reviewCards = _reviewQueue.toSet().toList()..shuffle(Random());
       setState(() {
         _questionQueue = [..._questionQueue, ...reviewCards];
@@ -195,9 +218,18 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     if (_currentIndex == total - 1) {
+      final summaryCorrect = _summaryCorrect > 0 ? _summaryCorrect : _correct;
+      final summaryTotal = _baseQuestionCount;
+      final summaryMissed = _summaryMissed > 0
+          ? _summaryMissed
+          : (summaryTotal - summaryCorrect).clamp(0, summaryTotal);
+
       setState(() {
         _showResults = true;
+        _questionQueue = [];
+        _reviewQueue = [];
       });
+
       return;
     }
 
@@ -214,34 +246,18 @@ class _QuizScreenState extends State<QuizScreen> {
     final allKanji = widget.repository.kanji;
 
     if (_showResults) {
+      final summaryCorrect = _summaryCorrect > 0 ? _summaryCorrect : _correct;
+      final summaryTotal = _baseQuestionCount;
+      final summaryMissed = _summaryMissed > 0
+          ? _summaryMissed
+          : (summaryTotal - summaryCorrect).clamp(0, summaryTotal);
+
       return QuizResultsView(
-        correct: _correct,
-        total: _questionQueue.length,
-        missed: _questionQueue.length - _correct,
-        onRestart: () {
-          setState(() {
-            _showResults = false;
-            _selectedType = null;
-            _questionQueue = [];
-            _reviewQueue = [];
-            _currentIndex = 0;
-            _correct = 0;
-            _answered = false;
-            _selectedOption = null;
-          });
-        },
-        onExit: () {
-          setState(() {
-            _showResults = false;
-            _selectedType = null;
-            _questionQueue = [];
-            _reviewQueue = [];
-            _currentIndex = 0;
-            _correct = 0;
-            _answered = false;
-            _selectedOption = null;
-          });
-        },
+        correct: summaryCorrect,
+        total: summaryTotal,
+        missed: summaryMissed,
+        onRestart: () => _startQuiz(_selectedType ?? QuizType.meaning),
+        onExit: _resetQuiz,
       );
     }
 
@@ -474,11 +490,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedType = null;
-                        });
-                      },
+                      onPressed: _resetQuiz,
                       child: const Text('Exit'),
                     ),
                   ),
@@ -584,67 +596,76 @@ class QuizResultsView extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F5FF),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1A27273F),
-                      blurRadius: 18,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.emoji_events, size: 48, color: Color(0xFF7A69E8)),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Quiz complete',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$correct of $total correct',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$missed missed kanji ready to review',
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                  ],
-                ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A27273F),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: onRestart,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF27273F),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: const Text('Start another quiz'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quiz complete',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$correct of $total correct',
+                    style: const TextStyle(fontSize: 16, color: Color(0xFF3B3658)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$missed missed kanji ready to review',
+                    style: const TextStyle(fontSize: 16, color: Color(0xFF3B3658)),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: onExit,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text('Exit'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: onRestart,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF27273F),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text('Try again'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: onExit,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: const Text('Back to quiz menu'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

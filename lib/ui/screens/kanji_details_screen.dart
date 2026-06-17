@@ -207,6 +207,38 @@ class _KanjiDetailsScreenState extends State<KanjiDetailsScreen> {
     );
   }
 
+  Widget _readingChip(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: items
+              .map(
+                (item) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F1FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(item),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _readingGroup(String title, List<String> items) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -236,7 +268,7 @@ class _KanjiDetailsScreenState extends State<KanjiDetailsScreen> {
                       color: const Color(0xFFF3F1FF),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text('$e (${_toRomaji(e)})'),
+                    child: Text('${e} (${_toRomaji(e)})'),
                   ),
                 )
                 .toList(),
