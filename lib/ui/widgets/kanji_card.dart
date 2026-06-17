@@ -6,11 +6,13 @@ import '../screens/kanji_details_screen.dart';
 class KanjiCard extends StatefulWidget {
   final Kanji kanji;
   final KanjiRepository repository;
+    final VoidCallback? onChanged;
 
   const KanjiCard({
     super.key,
     required this.kanji,
     required this.repository,
+        this.onChanged,
   });
 
   @override
@@ -32,6 +34,7 @@ class _KanjiCardState extends State<KanjiCard> {
           ),
         ).then((_) {
           if (mounted) setState(() {});
+                    widget.onChanged?.call();
         });
       },
       child: Container(
