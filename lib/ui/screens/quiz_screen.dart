@@ -147,7 +147,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (isCorrect) {
       setState(() => _correct++);
-      await widget.repository.markStudied(current);
+      widget.repository.markStudied(current);
     } else if (!_reviewQueue.any((k) => k.char == current.char)) {
       setState(() => _reviewQueue.add(current));
     }
