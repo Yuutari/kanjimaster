@@ -631,13 +631,13 @@ class QuizResultsView extends StatelessWidget {
                     '$correct of $total correct ($score%)',
                     style: TextStyle(fontSize: 16, color: subColor),
                   ),
-                  if (missed > 0) ..[
+                  ...(missed > 0 ? [
                     const SizedBox(height: 6),
                     Text(
                       '$missed missed kanji reviewed',
                       style: TextStyle(fontSize: 14, color: subColor),
                     ),
-                  ],
+                              ] : []),
                   const SizedBox(height: 28),
                   Row(
                     children: [
